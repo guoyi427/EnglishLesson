@@ -49,10 +49,7 @@ class ViewController: NSViewController {
         webView.navigationDelegate = self
         guard let contentURL = URL(string: homePath) else { return }
         let webRequest = URLRequest(url: contentURL)
-        webView.load(webRequest)
-        
-        //  进度
-        
+        webView.load(webRequest)    
     }
 
     override var representedObject: Any? {
