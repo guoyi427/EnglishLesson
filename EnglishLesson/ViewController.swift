@@ -25,23 +25,34 @@ class ViewController: NSViewController {
     var lessonIndex: Int = 0
     var currentLessonPath: String = ""
     
+    let requestSession = URLSession(configuration: URLSessionConfiguration.default)
     
+    let filePath = (NSSearchPathForDirectoriesInDomains(.downloadsDirectory, .userDomainMask, true).first! + "/EnglishLesson")
     
     /// content view
     @IBOutlet weak var webView: WKWebView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        //  directory
+        var isDir: ObjCBool = false
+        if !FileManager.default.fileExists(atPath: filePath, isDirectory: &isDir) {
+            do {
+                try FileManager.default.createDirectory(atPath: filePath, withIntermediateDirectories: false, attributes: nil)
+            } catch {
+                print(error)
+            }
+        }
     }
     
     override func awakeFromNib() {
-        // https://www.naiabc.com/nbabc/course?id=7&source=undefined
-
         webView.navigationDelegate = self
         guard let contentURL = URL(string: homePath) else { return }
         let webRequest = URLRequest(url: contentURL)
         webView.load(webRequest)
+        
+        //  进度
+        
     }
 
     override var representedObject: Any? {
@@ -109,8 +120,17 @@ extension ViewController {
         if webTitle.isEmpty || webTime.isEmpty || webBody.isEmpty || audioUrl.isEmpty {
             return
         }
-        print("parameter is prepare: title = \(webTitle), time = \(webTime), body = \(webBody.count), audio = \(audioUrl)")
-        print("执行保存操作")
+        //  保存文档
+        do {
+            try webBody.write(toFile: filePath + "/\(webTime)-\(webTitle).html", atomically: false, encoding: .utf8)
+        } catch {
+            print(error)
+        }
+        
+        //  下载音频
+        if let n_url = URL(string: audioUrl) {
+            downloadFile(url: n_url, fileName: "/\(webTime)-\(webTitle).mp3")
+        }
         
         //  保存操作后 跳转回课程列表页 跳转到下一节课
         lessonIndex += 1
@@ -124,6 +144,7 @@ extension ViewController {
         audioUrl = ""
     }
     
+    /// 解析课程列表页
     @objc fileprivate func analysisLessonPage() {
         webView.evaluateJavaScript("document.getElementsByClassName('item-container')[\(lessonIndex)].href") { (response, error) in
             guard let n_resp = response as? String else {
@@ -139,10 +160,31 @@ extension ViewController {
         }
         
     }
-    
+
+    /// 跳转页面
     fileprivate func jumpTo(path: String) {
         guard let pathUrl = URL(string: path) else { return }
         webView.load(URLRequest(url: pathUrl))
+    }
+    
+    /// 下载文件
+    fileprivate func downloadFile(url: URL, fileName: String) {
+        //  如果已经存在这个文件 就不下载了
+        let audioFilePath = self.filePath + "/\(fileName)"
+        if FileManager.default.fileExists(atPath: audioFilePath) {
+            print("\(fileName) exists")
+            return
+        }
+        
+        let task = requestSession.downloadTask(with: url) { (tempLocalUrl, response, error) in
+            guard let n_localUrl = tempLocalUrl else { return }
+            do {
+                try FileManager.default.copyItem(at: n_localUrl, to: URL(fileURLWithPath: audioFilePath))
+            } catch {
+                print(error)
+            }
+        }
+        task.resume()
     }
 }
 
@@ -158,7 +200,7 @@ extension ViewController: WKNavigationDelegate {
         } else if webView.url?.absoluteString == currentLessonPath {
             self.perform(#selector(linkButtonAction(_:)), with: nil, afterDelay: 1)
         } else if webView.url?.absoluteString == homePath {
-            self.perform(#selector(scanButtonAction(_:)), with: nil, afterDelay: 2)
+            self.perform(#selector(scanButtonAction(_:)), with: nil, afterDelay: 4)
         }
     }
     
